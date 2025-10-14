@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 
@@ -9,16 +9,11 @@ import pytz
 import requests
 import os
 
-load_dotenv()
-
 app = FastAPI(
     title="Fetch and return openrouter costs",
     version="1.0.0",
     description="Return total money spent on llm api requests",
 )
-
-token = os.getenv("API_TOKEN")
-headers = {"Authorization": f"Bearer {token}"}
 
 origins = ["*"]
 
@@ -30,12 +25,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    load_dotenv()
+    token = os.getenv("API_TOKEN")
+    app.state.headers = {"Authorization": f"Bearer {token}"}
 
 # -------------------------------
 # Pydantic models
 # -------------------------------
 
-
+def convert_to_sek(amount):
+    c = CurrencyRates()
+    rate = c.get_rate('USD', 'SEK')
+    return amount * rate
 
 # -------------------------------
 # Routes
@@ -43,14 +46,15 @@ app.add_middleware(
 
 
 @app.get("/get_openrouter_balance", summary="Openrouter balance")
-def get_openrouter_balance():
+def get_openrouter_balance(request: Request):
     """
-    Returns total openrouter balance and amount spent on llm queries.
+    Return total Openrouter balance and amount spent in sek.
     """
     url = "https://openrouter.ai/api/v1/credits"
-    response = requests.get(url, headers=headers)
+    print(request.app.state.headers)
+    response = requests.get(url, headers=request.app.state.headers)
     response_data = response.json()
     total_credits = response_data["data"]["total_credits"]
     spent_credits = response_data["data"]["total_usage"]
-    return {"total": total_credits, "spent": spent_credits}
+    return {"total": convert_to_sek(total_credits), "spent": convert_to_sek(spent_credits)}
 

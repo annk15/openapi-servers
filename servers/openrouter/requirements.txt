@@ -3,6 +3,7 @@ uvicorn[standard]
 pydantic
 python-multipart
 python-dotenv
-
+forex-python
+requests
 pytz
 python-dateutil

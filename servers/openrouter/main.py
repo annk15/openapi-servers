@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Body, Request
+from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
 
-
+from forex_python.converter import CurrencyRates
 from pydantic import BaseModel, Field
 from typing import Literal
 from dotenv import load_dotenv
@@ -10,9 +10,9 @@ import requests
 import os
 
 app = FastAPI(
-    title="Fetch and return openrouter costs",
+    title="Fetch data from OpenRouter",
     version="1.0.0",
-    description="Return total money spent on llm api requests",
+    description="Fetch and return data from openrouter's api",
 )
 
 origins = ["*"]
@@ -28,17 +28,18 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     load_dotenv()
-    token = os.getenv("API_TOKEN")
-    app.state.headers = {"Authorization": f"Bearer {token}"}
+    app.state.token = os.getenv("API_TOKEN")
+    print("Open Router token found!") 
 
 # -------------------------------
 # Pydantic models
 # -------------------------------
 
-def convert_to_sek(amount):
-    c = CurrencyRates()
-    rate = c.get_rate('USD', 'SEK')
-    return amount * rate
+def update_rates():
+    rate = requests.get("https://api.frankfurter.app/latest", params={"base":"USD","symbols":"SEK"}, timeout=10).json()["rates"]["SEK"]
+    print(rate)
+    app.state.usd_sek_rate = rate
+    print("Fetched exchange rate: " + str(rate)) 
 
 # -------------------------------
 # Routes
@@ -46,15 +47,17 @@ def convert_to_sek(amount):
 
 
 @app.get("/get_openrouter_balance", summary="Openrouter balance")
-def get_openrouter_balance(request: Request):
+def get_openrouter_balance():
     """
-    Return total Openrouter balance and amount spent in sek.
+    Return total and spent amount in sek
     """
+    update_rates()
     url = "https://openrouter.ai/api/v1/credits"
-    print(request.app.state.headers)
-    response = requests.get(url, headers=request.app.state.headers)
+    response = requests.get(url, headers={"Authorization": f"Bearer {app.state.token}"})
     response_data = response.json()
     total_credits = response_data["data"]["total_credits"]
     spent_credits = response_data["data"]["total_usage"]
-    return {"total": convert_to_sek(total_credits), "spent": convert_to_sek(spent_credits)}
+    return {"total in kr": total_credits * app.state.usd_sek_rate, "spent in kr": spent_credits * app.state.usd_sek_rate}
+
+
 

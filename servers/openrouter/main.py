@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from forex_python.converter import CurrencyRates
@@ -35,12 +35,6 @@ async def startup_event():
 # Pydantic models
 # -------------------------------
 
-def update_rates():
-    rate = requests.get("https://api.frankfurter.app/latest", params={"base":"USD","symbols":"SEK"}, timeout=10).json()["rates"]["SEK"]
-    print(rate)
-    app.state.usd_sek_rate = rate
-    print("Fetched exchange rate: " + str(rate)) 
-
 # -------------------------------
 # Routes
 # -------------------------------
@@ -49,15 +43,39 @@ def update_rates():
 @app.get("/get_openrouter_balance", summary="Openrouter balance")
 def get_openrouter_balance():
     """
-    Return total and spent amount in sek
+    Return total and spent amount in usd
     """
-    update_rates()
+
     url = "https://openrouter.ai/api/v1/credits"
     response = requests.get(url, headers={"Authorization": f"Bearer {app.state.token}"})
     response_data = response.json()
     total_credits = response_data["data"]["total_credits"]
     spent_credits = response_data["data"]["total_usage"]
-    return {"total in kr": total_credits * app.state.usd_sek_rate, "spent in kr": spent_credits * app.state.usd_sek_rate}
+    return {"total in usd": total_credits, "spent in usd": spent_credits}
+
+@app.get("/get_openrouter_models", summary="OpenRouter models")
+def get_openrouter_models(
+    request: Request,
+    category: str | None = Query(None, description="Optional model category")
+):
+    """
+    Return models available at OpenRouter.
+    You can limit results by category, e.g.:
+    roleplay, programming, marketing, technology, science, translation,
+    legal, finance, health, trivia, academia
+    """
+    url = "https://openrouter.ai/api/v1/models"
+    if category:
+        url += f"?category={category}"
+
+    headers = {"Authorization": f"Bearer {request.app.state.token}"}
+
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return {"error": str(e)}
 
 
 

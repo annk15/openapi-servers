@@ -1,24 +1,24 @@
-#This is an example that uses the websockets api to know when a prompt execution is done
-#Once the prompt execution is done it downloads the images using the /history endpoint
+# No websockets needed: POST prompt -> poll /history -> fetch images via /view
 
-import websocket  # NOTE: websocket-client (https://github.com/websocket-client/websocket-client)
 import uuid
 import json
+import time
 import urllib.request
 import urllib.parse
+import random
 from typing import Dict, List, Optional
 
 server_address = "192.168.100.143:8188"
 client_id = str(uuid.uuid4())
 
-DEFAULT_PROMPT_TEXT = """
+DEFAULT_PROMPT_TEXT = r"""
 {
   "3": {
     "inputs": {
-      "seed": 305025891131221,
+      "seed": 385852524697596,
       "steps": 20,
-      "cfg": 6,
-      "sampler_name": "euler_ancestral",
+      "cfg": 7,
+      "sampler_name": "res_2s",
       "scheduler": "beta57",
       "denoise": 1,
       "model": [
@@ -45,7 +45,7 @@ DEFAULT_PROMPT_TEXT = """
   },
   "4": {
     "inputs": {
-      "ckpt_name": "waiNSFWIllustrious_v130.safetensors"
+      "ckpt_name": "waiNSFWIllustrious_v150.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -175,7 +175,7 @@ DEFAULT_PROMPT_TEXT = """
   },
   "12": {
     "inputs": {
-      "text": "1girl, solo, succubus, demon girl, flirty, red eyes, medium breasts, black bikini, long black hair, small curved horns, bat wings, glowing purple aura, seductive gaze, tentacles, tentacle on breasts, tentacle between breasts, underwater, hentai style"
+      "text": "1girl, zombie girl, biting man's head, blood gushing, torn ragged clothes, decayed green skin, exposed bones, sharp fangs, aggressive lunge, horror, dark alleyway background, night time, low light, dynamic pose, fear expression on victim"
     },
     "class_type": "Text Multiline",
     "_meta": {
@@ -184,7 +184,7 @@ DEFAULT_PROMPT_TEXT = """
   },
   "13": {
     "inputs": {
-      "text": "JmoxComic,mythp0rt, masterpiece, best quality, amazing quality, ultra-detailed, highly detailed\n\n"
+      "text": "JmoxComic,mythp0rt, masterpiece, newest, absurdres, best quality, amazing quality, very aesthetic, ultra-detailed, highly detailed\n\n"
     },
     "class_type": "Text Multiline",
     "_meta": {
@@ -194,69 +194,129 @@ DEFAULT_PROMPT_TEXT = """
 }
 """
 
-def queue_prompt(prompt, prompt_id):
-    p = {"prompt": prompt, "client_id": client_id, "prompt_id": prompt_id}
-    data = json.dumps(p).encode('utf-8')
-    req = urllib.request.Request("http://{}/prompt".format(server_address), data=data)
-    urllib.request.urlopen(req).read()
+# ---------- HTTP helpers ----------
 
-def get_image(filename, subfolder, folder_type):
-    data = {"filename": filename, "subfolder": subfolder, "type": folder_type}
-    url_values = urllib.parse.urlencode(data)
-    with urllib.request.urlopen("http://{}/view?{}".format(server_address, url_values)) as response:
-        return response.read()
+def http_post_json(url: str, payload: dict, timeout: int = 120) -> dict:
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data)
+    req.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = resp.read()
+    # best-effort parse (ComfyUI returns JSON)
+    return json.loads(body.decode("utf-8")) if body else {}
 
-def get_history(prompt_id):
-    with urllib.request.urlopen("http://{}/history/{}".format(server_address, prompt_id)) as response:
-        return json.loads(response.read())
+def http_get_json(url: str, timeout: int = 60) -> dict:
+    with urllib.request.urlopen(url, timeout=timeout) as resp:
+        body = resp.read()
+    return json.loads(body.decode("utf-8")) if body else {}
 
-def get_images(ws, prompt):
-    prompt_id = str(uuid.uuid4())
-    queue_prompt(prompt, prompt_id)
-    output_images = {}
+# ---------- ComfyUI-specific calls ----------
+
+def queue_prompt(prompt: dict, prompt_id: str) -> None:
+    """POST the workflow to /prompt (no websocket)."""
+    url = f"http://{server_address}/prompt"
+    payload = {"prompt": prompt, "client_id": client_id, "prompt_id": prompt_id}
+    # We don't strictly need the response here, but parsing helps surface errors.
+    _ = http_post_json(url, payload)
+
+def get_history(prompt_id: str) -> dict:
+    """Fetch /history/{prompt_id}."""
+    url = f"http://{server_address}/history/{prompt_id}"
+    return http_get_json(url)
+
+def get_image(filename: str, subfolder: str, folder_type: str) -> bytes:
+    """Fetch binary image data via /view."""
+    params = urllib.parse.urlencode(
+        {"filename": filename, "subfolder": subfolder, "type": folder_type}
+    )
+    url = f"http://{server_address}/view?{params}"
+    with urllib.request.urlopen(url, timeout=120) as resp:
+        return resp.read()
+
+def wait_until_done(prompt_id: str, poll_interval: float = 1.0, max_wait: int = 600) -> dict:
+    """
+    Poll /history/{prompt_id} until execution is finished or timeout.
+    Returns the history dict for this prompt_id.
+    """
+    start = time.time()
+    last = None
     while True:
-        out = ws.recv()
-        if isinstance(out, str):
-            message = json.loads(out)
-            if message['type'] == 'executing':
-                data = message['data']
-                if data['node'] is None and data['prompt_id'] == prompt_id:
-                    break #Execution is done
-        else:
-            # If you want to be able to decode the binary stream for latent previews, here is how you can do it:
-            # bytesIO = BytesIO(out[8:])
-            # preview_image = Image.open(bytesIO) # This is your preview in PIL image format, store it in a global
-            continue #previews are binary data
+        # /history returns a dict keyed by prompt_id
+        hist_all = get_history(prompt_id)
+        if prompt_id in hist_all:
+            last = hist_all[prompt_id]
 
-    history = get_history(prompt_id)[prompt_id]
-    for node_id in history['outputs']:
-        node_output = history['outputs'][node_id]
-        images_output = []
-        if 'images' in node_output:
-            for image in node_output['images']:
-                image_data = get_image(image['filename'], image['subfolder'], image['type'])
-                images_output.append(image_data)
-        output_images[node_id] = images_output
+            # Heuristics to detect completion:
+            # - Many ComfyUI builds add status info, but a portable check is:
+            #   outputs exist AND at least one node has "images".
+            outputs = last.get("outputs", {})
+            if outputs:
+                any_images = any("images" in node for node in outputs.values())
+                if any_images:
+                    return last
+
+            # Some installs include a finishing flag:
+            # status = last.get("status", {})
+            # if status.get("completed") is True: return last
+
+        if time.time() - start > max_wait:
+            raise TimeoutError(f"Prompt {prompt_id} did not finish within {max_wait}s")
+
+        time.sleep(poll_interval)
+
+# ---------- Your public API ----------
+
+def update_workflow(positive_text: str, negative_text: str, seed: int) -> dict:
+    """
+    Return a prompt dictionary with optional overrides.
+    (Modify below to actually apply your overrides if desired.)
+    """
+    workflow = json.loads(DEFAULT_PROMPT_TEXT)
+    # Example if you want to override:
+    workflow["12"]["inputs"]["text"] = positive_text
+    workflow["7"]["inputs"]["text"] = negative_text
+    workflow["3"]["inputs"]["seed"] = seed
+    return workflow
+
+def generate_images(
+    positive_text,
+    negative_text: Optional[str] = None,
+    seed: Optional[int] = None
+) -> Dict[str, List[bytes]]:
+    """
+    Submit the workflow, poll until done, then fetch images grouped by node_id.
+    Returns: { node_id: [image_bytes, ...], ... }
+    """
+
+    negative_default = "low quality, worst quality, lowres, username, sketch, censor, blurry, distorted, bad anatomy, signature, watermark, patreon logo, artist name"
+    seed_default = random.randint(0, 2**32 - 1)
+
+    print("- Generate image with:")
+    print("Positive prompt: "+positive_text)
+    print( f"No negative prompt provided, will use default: {negative_default}" if negative_text is None else f"Negative prompt: {negative_text}" )
+    print( f"No seed provided, will use default: {seed_default}" if seed is None else f"Seed: {seed}" )
+
+    workflow = update_workflow(
+        positive_text,
+        negative_text if negative_text is not None else negative_default,
+        seed if seed is not None else seed_default,
+    )
+
+    prompt_id = str(uuid.uuid4())
+    queue_prompt(workflow, prompt_id)
+
+    # Poll /history until finished
+    history_entry = wait_until_done(prompt_id)
+
+    # Download all produced images
+    output_images: Dict[str, List[bytes]] = {}
+    outputs = history_entry.get("outputs", {})
+    for node_id, node_output in outputs.items():
+        images_output: List[bytes] = []
+        for image in node_output.get("images", []):
+            img = get_image(image["filename"], image["subfolder"], image["type"])
+            images_output.append(img)
+        if images_output:
+            output_images[node_id] = images_output
 
     return output_images
-
-def build_prompt(positive_text: str = "masterpiece best quality man", seed: int = 5) -> dict:
-    """Return a prompt dictionary with optional overrides."""
-    prompt = json.loads(DEFAULT_PROMPT_TEXT)
-    """prompt["6"]["inputs"]["text"] = positive_text
-    prompt["3"]["inputs"]["seed"] = seed"""
-    return prompt
-
-def generate_images(positive_text: Optional[str] = None, seed: Optional[int] = None) -> Dict[str, List[bytes]]:
-    """Trigger a prompt execution and return generated images grouped by node."""
-    prompt = build_prompt(
-        positive_text if positive_text is not None else "masterpiece best quality man",
-        seed if seed is not None else 5,
-    )
-    ws = websocket.WebSocket()
-    ws.connect("ws://{}/ws?clientId={}".format(server_address, client_id))
-    try:
-        images = get_images(ws, prompt)
-    finally:
-        ws.close()
-    return images

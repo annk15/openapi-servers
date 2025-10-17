@@ -47,8 +47,11 @@ async def startup_event():
 @app.get("/generate_image", summary="Generate a image")
 def generate_image(
     request: Request,
-    positive_prompt: Optional[str] = Query(
-        None, description="Positive text prompt for the CLIPTextEncode node."
+    positive: Optional[str] = Query(
+        None, description="Requiered positive text prompt for the CLIPTextEncode node."
+    ),
+    negative: Optional[str] = Query(
+        None, description="Optional negative text prompt for the CLIPTextEncode node."
     ),
     seed: Optional[int] = Query(
         None, ge=0, description="Optional seed to reproduce results."
@@ -58,9 +61,11 @@ def generate_image(
     Trigger ComfyUI to generate an image and return a Markdown image reference
     that points to a publicly accessible URL.
     """
+
     try:
         images_by_node = generate_images(
-            positive_text=positive_prompt,
+            positive_text=positive,
+            negative_text=negative,
             seed=seed,
         )
     except Exception as exc:

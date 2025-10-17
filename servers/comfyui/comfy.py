@@ -24,10 +24,19 @@ class WorkflowConfig:
     name: str
     filename: str
     field_paths: Dict[str, Tuple[str, ...]]
+    description: str
 
     @property
     def path(self) -> Path:
         return WORKFLOWS_DIR / self.filename
+
+    def as_dict(self, *, active: bool) -> Dict[str, Any]:
+        """Serialize the config for API responses."""
+        return {
+            "name": self.name,
+            "description": self.description,
+            "active": active,
+        }
 
 
 class WorkflowManager:
@@ -43,6 +52,9 @@ class WorkflowManager:
     # --- workflow bookkeeping -------------------------------------------------
     def list_workflows(self) -> List[str]:
         return sorted(self._configs.keys())
+
+    def list_configs(self) -> List[WorkflowConfig]:
+        return [self._configs[name] for name in self.list_workflows()]
 
     def set_active(self, name: str) -> None:
         if name not in self._configs:
@@ -144,6 +156,7 @@ WORKFLOW_CONFIGS: Dict[str, WorkflowConfig] = {
             "negative": ("7", "inputs", "text"),
             "seed": ("3", "inputs", "seed"),
         },
+        description="A comic styled workflow with vibrant colors",
     ),
 }
 
@@ -158,6 +171,14 @@ def get_available_workflows() -> List[str]:
 def get_active_workflow() -> str:
     """Return the active workflow name."""
     return workflow_manager.get_active()
+
+def get_workflow_configs() -> List[Dict[str, Any]]:
+    """Return serialized workflow configs for API consumers."""
+    active = workflow_manager.get_active()
+    return [
+        config.as_dict(active=(config.name == active))
+        for config in workflow_manager.list_configs()
+    ]
 
 
 def set_active_workflow(workflow_name: str) -> None:

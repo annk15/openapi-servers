@@ -9,7 +9,12 @@ import uuid
 import imghdr
 import random
 
-from comfy import generate_images
+from comfy import (
+    generate_images,
+    get_active_workflow,
+    get_workflow_configs,
+    set_active_workflow,
+)
 
 IMAGE_DIR = Path("./output")
 
@@ -41,6 +46,29 @@ async def startup_event():
 # -------------------------------
 # Routes
 # -------------------------------
+
+@app.get("/workflows", summary="List available workflow configurations")
+def list_workflows():
+    """
+    Return the configured workflows along with which one is currently active.
+    """
+    return {"workflows": get_workflow_configs()}
+
+
+@app.post("/workflows/{workflow_name}/activate", summary="Set the active workflow")
+def activate_workflow(workflow_name: str):
+    """
+    Update the active workflow used for subsequent generations.
+    """
+    try:
+        set_active_workflow(workflow_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    return {
+        "active": get_active_workflow(),
+        "workflows": get_workflow_configs(),
+    }
 
 
 @app.get("/generate_image", summary="Generate a image based on input parameters")

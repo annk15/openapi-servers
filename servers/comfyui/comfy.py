@@ -1,215 +1,173 @@
 # No websockets needed: POST prompt -> poll /history -> fetch images via /view
 
+import os
 import uuid
 import json
 import time
 import urllib.request
 import urllib.parse
-from typing import Dict, List, Optional
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 server_address = "192.168.100.143:8188"
 client_id = str(uuid.uuid4())
 
-DEFAULT_PROMPT_TEXT = r"""
-{
-  "3": {
-    "inputs": {
-      "seed": 223279903950754,
-      "steps": 20,
-      "cfg": 5.5,
-      "sampler_name": "res_2s",
-      "scheduler": "beta57",
-      "denoise": 1,
-      "model": [
-        "10",
-        0
-      ],
-      "positive": [
-        "6",
-        0
-      ],
-      "negative": [
-        "7",
-        0
-      ],
-      "latent_image": [
-        "5",
-        0
-      ]
-    },
-    "class_type": "KSampler",
-    "_meta": {
-      "title": "KSampler"
-    }
-  },
-  "4": {
-    "inputs": {
-      "ckpt_name": "waiNSFWIllustrious_v150.safetensors"
-    },
-    "class_type": "CheckpointLoaderSimple",
-    "_meta": {
-      "title": "Load Checkpoint"
-    }
-  },
-  "5": {
-    "inputs": {
-      "width": 832,
-      "height": 1216,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
-  "6": {
-    "inputs": {
-      "text": [
-        "15",
-        0
-      ],
-      "clip": [
-        "10",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Prompt)"
-    }
-  },
-  "7": {
-    "inputs": {
-      "text": "embedding:lazyneg",
-      "clip": [
-        "10",
-        1
-      ]
-    },
-    "class_type": "CLIPTextEncode",
-    "_meta": {
-      "title": "CLIP Text Encode (Prompt)"
-    }
-  },
-  "8": {
-    "inputs": {
-      "samples": [
-        "3",
-        0
-      ],
-      "vae": [
-        "4",
-        2
-      ]
-    },
-    "class_type": "VAEDecode",
-    "_meta": {
-      "title": "VAE Decode"
-    }
-  },
-  "9": {
-    "inputs": {
-      "filename_prefix": "ComfyUI",
-      "images": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "SaveImage",
-    "_meta": {
-      "title": "Save Image"
-    }
-  },
-  "10": {
-    "inputs": {
-      "PowerLoraLoaderHeaderWidget": {
-        "type": "PowerLoraLoaderHeaderWidget"
-      },
-      "lora_1": {
-        "on": true,
-        "lora": "ILLMythP0rtr4itStyle.safetensors",
-        "strength": 0.9
-      },
-      "lora_2": {
-        "on": true,
-        "lora": "JMoxComix_style-12.safetensors",
-        "strength": 0.8
-      },
-      "lora_3": {
-        "on": true,
-        "lora": "Dramatic Lighting Slider.safetensors",
-        "strength": 2.2
-      },
-      "lora_4": {
-        "on": false,
-        "lora": "JAB_Illustrious_V1.5.safetensors",
-        "strength": 0.4
-      },
-      "➕ Add Lora": "",
-      "model": [
-        "4",
-        0
-      ],
-      "clip": [
-        "4",
-        1
-      ]
-    },
-    "class_type": "Power Lora Loader (rgthree)",
-    "_meta": {
-      "title": "Power Lora Loader (rgthree)"
-    }
-  },
-  "12": {
-    "inputs": {
-      "text": "Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form"
-    },
-    "class_type": "Text Multiline",
-    "_meta": {
-      "title": "dynamicInput"
-    }
-  },
-  "13": {
-    "inputs": {
-      "text": "embedding:lazypos,JmoxComic,mythp0rt"
-    },
-    "class_type": "Text Multiline",
-    "_meta": {
-      "title": "staticInput"
-    }
-  },
-  "15": {
-    "inputs": {
-      "delimiter": "comma",
-      "text1": [
-        "13",
-        0
-      ],
-      "text2": [
-        "12",
-        0
-      ]
-    },
-    "class_type": "Text Concatenate (JPS)",
-    "_meta": {
-      "title": "Text Concatenate (JPS)"
-    }
-  },
-  "18": {
-    "inputs": {
-      "text": "embedding:lazypos,JmoxComic,mythp0rt, Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form",
-      "anything": [
-        "15",
-        0
-      ]
-    },
-    "class_type": "easy showAnything",
-    "_meta": {
-      "title": "Show Any"
-    }
-  }
+WORKFLOWS_DIR = Path(__file__).parent / "workflows"
+DEFAULT_WORKFLOW_NAME = "illustrious"
+
+
+@dataclass(frozen=True)
+class WorkflowConfig:
+    """Lightweight descriptor for a workflow file and how to override key fields."""
+
+    name: str
+    filename: str
+    field_paths: Dict[str, Tuple[str, ...]]
+
+    @property
+    def path(self) -> Path:
+        return WORKFLOWS_DIR / self.filename
+
+
+class WorkflowManager:
+    """
+    Handles loading workflow definitions and applying prompt overrides.
+    Additional workflows only need to be registered in `WORKFLOW_CONFIGS`.
+    """
+
+    def __init__(self, configs: Dict[str, WorkflowConfig], default: str):
+        self._configs = configs
+        self._active = os.getenv("COMFY_ACTIVE_WORKFLOW", default)
+
+    # --- workflow bookkeeping -------------------------------------------------
+    def list_workflows(self) -> List[str]:
+        return sorted(self._configs.keys())
+
+    def set_active(self, name: str) -> None:
+        if name not in self._configs:
+            raise ValueError(f"Unknown workflow '{name}'. Available: {self.list_workflows()}")
+        self._active = name
+
+    def get_active(self) -> str:
+        if self._active not in self._configs:
+            if not self._configs:
+                raise RuntimeError("No workflows configured.")
+            self._active = self.list_workflows()[0]
+        return self._active
+
+    # --- loading and defaults -------------------------------------------------
+    def _load(self, name: Optional[str] = None) -> Tuple[WorkflowConfig, Dict[str, Any]]:
+        target = self.get_active() if name is None else name
+        if target not in self._configs:
+            raise ValueError(f"Unknown workflow '{target}'. Available: {self.list_workflows()}")
+        config = self._configs[target]
+        path = config.path
+        if not path.exists():
+            raise FileNotFoundError(f"Workflow file not found: {path}")
+        with path.open("r", encoding="utf-8") as fh:
+            return config, json.load(fh)
+
+    def get_defaults(self, name: Optional[str] = None) -> Dict[str, Any]:
+        config, workflow = self._load(name)
+        return _extract_defaults(workflow, config.field_paths)
+
+    # --- override application -------------------------------------------------
+    def build_workflow(
+        self,
+        *,
+        positive: Optional[str],
+        negative: Optional[str],
+        seed: Optional[int],
+    ) -> Dict[str, Any]:
+        config, workflow = self._load()
+        defaults = _extract_defaults(workflow, config.field_paths)
+
+        resolved = {
+            "positive": positive if positive is not None else defaults.get("positive"),
+            "negative": negative if negative is not None else defaults.get("negative"),
+            "seed": seed if seed is not None else defaults.get("seed"),
+        }
+
+        if resolved["positive"] is None:
+            raise ValueError(
+                f"Positive text is required but no default exists for workflow '{config.name}'"
+            )
+
+        for field, value in resolved.items():
+            if value is None:
+                continue
+            path = config.field_paths.get(field)
+            if path:
+                _set_by_path(workflow, path, value)
+
+        return workflow
+
+
+def _get_by_path(data: Dict[str, Any], path: Tuple[str, ...]) -> Any:
+    node: Any = data
+    for key in path:
+        node = node[key]
+    return node
+
+
+def _has_path(data: Dict[str, Any], path: Tuple[str, ...]) -> bool:
+    node: Any = data
+    for key in path:
+        if key not in node:
+            return False
+        node = node[key]
+    return True
+
+
+def _set_by_path(data: Dict[str, Any], path: Tuple[str, ...], value: Any) -> None:
+    node: Any = data
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+
+
+def _extract_defaults(workflow: Dict[str, Any], field_paths: Dict[str, Tuple[str, ...]]) -> Dict[str, Any]:
+    defaults: Dict[str, Any] = {}
+    for field, path in field_paths.items():
+        if _has_path(workflow, path):
+            defaults[field] = _get_by_path(workflow, path)
+    return defaults
+
+
+WORKFLOW_CONFIGS: Dict[str, WorkflowConfig] = {
+    "illustrious": WorkflowConfig(
+        name="illustrious",
+        filename="illustrious.json",
+        field_paths={
+            "positive": ("12", "inputs", "text"),
+            "negative": ("7", "inputs", "text"),
+            "seed": ("3", "inputs", "seed"),
+        },
+    ),
 }
-"""
+
+workflow_manager = WorkflowManager(WORKFLOW_CONFIGS, DEFAULT_WORKFLOW_NAME)
+
+
+def get_available_workflows() -> List[str]:
+    """List the workflow names that are currently configured."""
+    return workflow_manager.list_workflows()
+
+
+def get_active_workflow() -> str:
+    """Return the active workflow name."""
+    return workflow_manager.get_active()
+
+
+def set_active_workflow(workflow_name: str) -> None:
+    """Switch the active workflow."""
+    workflow_manager.set_active(workflow_name)
+
+
+def get_workflow_defaults(name: Optional[str] = None) -> Dict[str, Any]:
+    """Expose defaults for callers that need to inspect workflow parameters."""
+    return workflow_manager.get_defaults(name)
 
 # ---------- HTTP helpers ----------
 
@@ -283,17 +241,17 @@ def wait_until_done(prompt_id: str, poll_interval: float = 1.0, max_wait: int = 
 
 # ---------- Your public API ----------
 
-def update_workflow(positive_text: str, negative_text: str, seed: int) -> dict:
-    """
-    Return a prompt dictionary with optional overrides.
-    (Modify below to actually apply your overrides if desired.)
-    """
-    workflow = json.loads(DEFAULT_PROMPT_TEXT)
-    # Example if you want to override:
-    workflow["12"]["inputs"]["text"] = positive_text
-    workflow["7"]["inputs"]["text"] = negative_text
-    workflow["3"]["inputs"]["seed"] = seed
-    return workflow
+def update_workflow(
+    positive_text: Optional[str],
+    negative_text: Optional[str],
+    seed: Optional[int],
+) -> Dict[str, Any]:
+    """Wrapper around workflow manager for backward compatibility."""
+    return workflow_manager.build_workflow(
+        positive=positive_text,
+        negative=negative_text,
+        seed=seed,
+    )
 
 def generate_images(
     positive_text,
@@ -306,9 +264,9 @@ def generate_images(
     """
 
     workflow = update_workflow(
-        positive_text,
-        negative_text if negative_text is not None else negative_default,
-        seed if seed is not None else seed_default,
+        positive_text=positive_text,
+        negative_text=negative_text,
+        seed=seed,
     )
 
     prompt_id = str(uuid.uuid4())

@@ -158,6 +158,16 @@ WORKFLOW_CONFIGS: Dict[str, WorkflowConfig] = {
         },
         description="A comic styled workflow with vibrant colors",
     ),
+    "realhybrid": WorkflowConfig(
+        name="realhybrid",
+        filename="realhybrid.json",
+        field_paths={
+            "positive": ("12", "inputs", "text"),
+            "negative": ("7", "inputs", "text"),
+            "seed": ("3", "inputs", "seed"),
+        },
+        description="A workflow that excels at creating realistic anime",
+    ),
 }
 
 workflow_manager = WorkflowManager(WORKFLOW_CONFIGS, DEFAULT_WORKFLOW_NAME)

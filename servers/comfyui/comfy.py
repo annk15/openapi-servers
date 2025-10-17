@@ -14,8 +14,8 @@ DEFAULT_PROMPT_TEXT = r"""
 {
   "3": {
     "inputs": {
-      "seed": 139861340894710,
-      "steps": 30,
+      "seed": 223279903950754,
+      "steps": 20,
       "cfg": 5.5,
       "sampler_name": "res_2s",
       "scheduler": "beta57",
@@ -65,7 +65,7 @@ DEFAULT_PROMPT_TEXT = r"""
   "6": {
     "inputs": {
       "text": [
-        "11",
+        "15",
         0
       ],
       "clip": [
@@ -80,7 +80,7 @@ DEFAULT_PROMPT_TEXT = r"""
   },
   "7": {
     "inputs": {
-      "text": "low quality, worst quality, lowres, username, sketch, censor, blurry, distorted, bad anatomy, signature, watermark, patreon logo, artist name",
+      "text": "embedding:lazyneg",
       "clip": [
         "10",
         1
@@ -133,7 +133,7 @@ DEFAULT_PROMPT_TEXT = r"""
       "lora_2": {
         "on": true,
         "lora": "JMoxComix_style-12.safetensors",
-        "strength": 0.7
+        "strength": 0.8
       },
       "lora_3": {
         "on": true,
@@ -142,13 +142,8 @@ DEFAULT_PROMPT_TEXT = r"""
       },
       "lora_4": {
         "on": false,
-        "lora": "Tentacles_-_Inma_Seiden_Style_Illustrious.safetensors",
-        "strength": 1
-      },
-      "lora_5": {
-        "on": false,
-        "lora": "Tentacles_-_Inma_Seiden_Style_Illustrious.safetensors",
-        "strength": 1
+        "lora": "JAB_Illustrious_V1.5.safetensors",
+        "strength": 0.4
       },
       "➕ Add Lora": "",
       "model": [
@@ -165,26 +160,9 @@ DEFAULT_PROMPT_TEXT = r"""
       "title": "Power Lora Loader (rgthree)"
     }
   },
-  "11": {
-    "inputs": {
-      "separator": ",",
-      "text_1": [
-        "12",
-        0
-      ],
-      "text_2": [
-        "13",
-        0
-      ]
-    },
-    "class_type": "TextConcatenate",
-    "_meta": {
-      "title": "TextConcatenate"
-    }
-  },
   "12": {
     "inputs": {
-      "text": "1girl, solo, smiling, happy, waving, upper body"
+      "text": "Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form"
     },
     "class_type": "Text Multiline",
     "_meta": {
@@ -193,11 +171,41 @@ DEFAULT_PROMPT_TEXT = r"""
   },
   "13": {
     "inputs": {
-      "text": "nsfw, JmoxComic,mythp0rt, masterpiece, best quality\n"
+      "text": "embedding:lazypos,JmoxComic,mythp0rt"
     },
     "class_type": "Text Multiline",
     "_meta": {
       "title": "staticInput"
+    }
+  },
+  "15": {
+    "inputs": {
+      "delimiter": "comma",
+      "text1": [
+        "13",
+        0
+      ],
+      "text2": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "Text Concatenate (JPS)",
+    "_meta": {
+      "title": "Text Concatenate (JPS)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "text": "embedding:lazypos,JmoxComic,mythp0rt, Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form",
+      "anything": [
+        "15",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
     }
   }
 }

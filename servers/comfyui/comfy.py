@@ -5,7 +5,6 @@ import json
 import time
 import urllib.request
 import urllib.parse
-import random
 from typing import Dict, List, Optional
 
 server_address = "192.168.100.143:8188"
@@ -15,9 +14,9 @@ DEFAULT_PROMPT_TEXT = r"""
 {
   "3": {
     "inputs": {
-      "seed": 385852524697596,
-      "steps": 20,
-      "cfg": 7,
+      "seed": 139861340894710,
+      "steps": 30,
+      "cfg": 5.5,
       "sampler_name": "res_2s",
       "scheduler": "beta57",
       "denoise": 1,
@@ -141,6 +140,16 @@ DEFAULT_PROMPT_TEXT = r"""
         "lora": "Dramatic Lighting Slider.safetensors",
         "strength": 2.2
       },
+      "lora_4": {
+        "on": false,
+        "lora": "Tentacles_-_Inma_Seiden_Style_Illustrious.safetensors",
+        "strength": 1
+      },
+      "lora_5": {
+        "on": false,
+        "lora": "Tentacles_-_Inma_Seiden_Style_Illustrious.safetensors",
+        "strength": 1
+      },
       "➕ Add Lora": "",
       "model": [
         "4",
@@ -175,7 +184,7 @@ DEFAULT_PROMPT_TEXT = r"""
   },
   "12": {
     "inputs": {
-      "text": "1girl, zombie girl, biting man's head, blood gushing, torn ragged clothes, decayed green skin, exposed bones, sharp fangs, aggressive lunge, horror, dark alleyway background, night time, low light, dynamic pose, fear expression on victim"
+      "text": "1girl, solo, smiling, happy, waving, upper body"
     },
     "class_type": "Text Multiline",
     "_meta": {
@@ -184,7 +193,7 @@ DEFAULT_PROMPT_TEXT = r"""
   },
   "13": {
     "inputs": {
-      "text": "JmoxComic,mythp0rt, masterpiece, newest, absurdres, best quality, amazing quality, very aesthetic, ultra-detailed, highly detailed\n\n"
+      "text": "nsfw, JmoxComic,mythp0rt, masterpiece, best quality\n"
     },
     "class_type": "Text Multiline",
     "_meta": {
@@ -287,14 +296,6 @@ def generate_images(
     Submit the workflow, poll until done, then fetch images grouped by node_id.
     Returns: { node_id: [image_bytes, ...], ... }
     """
-
-    negative_default = "low quality, worst quality, lowres, username, sketch, censor, blurry, distorted, bad anatomy, signature, watermark, patreon logo, artist name"
-    seed_default = random.randint(0, 2**32 - 1)
-
-    print("- Generate image with:")
-    print("Positive prompt: "+positive_text)
-    print( f"No negative prompt provided, will use default: {negative_default}" if negative_text is None else f"Negative prompt: {negative_text}" )
-    print( f"No seed provided, will use default: {seed_default}" if seed is None else f"Seed: {seed}" )
 
     workflow = update_workflow(
         positive_text,

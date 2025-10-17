@@ -1,0 +1,198 @@
+{
+  "3": {
+    "inputs": {
+      "seed": 1113557361648316,
+      "steps": 20,
+      "cfg": 5.5,
+      "sampler_name": "res_2s",
+      "scheduler": "beta57",
+      "denoise": 1,
+      "model": [
+        "10",
+        0
+      ],
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "latent_image": [
+        "5",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "4": {
+    "inputs": {
+      "ckpt_name": "illustrij_v18.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "5": {
+    "inputs": {
+      "width": 832,
+      "height": 1216,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "6": {
+    "inputs": {
+      "text": [
+        "15",
+        0
+      ],
+      "clip": [
+        "10",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": "embedding:lazyneg",
+      "clip": [
+        "10",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "8": {
+    "inputs": {
+      "samples": [
+        "3",
+        0
+      ],
+      "vae": [
+        "4",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "9": {
+    "inputs": {
+      "filename_prefix": "ComfyUI",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "10": {
+    "inputs": {
+      "PowerLoraLoaderHeaderWidget": {
+        "type": "PowerLoraLoaderHeaderWidget"
+      },
+      "lora_1": {
+        "on": false,
+        "lora": "ILLMythP0rtr4itStyle.safetensors",
+        "strength": 0.9
+      },
+      "lora_2": {
+        "on": false,
+        "lora": "JMoxComix_style-12.safetensors",
+        "strength": 0.8
+      },
+      "lora_3": {
+        "on": false,
+        "lora": "Dramatic Lighting Slider.safetensors",
+        "strength": 2.2
+      },
+      "lora_4": {
+        "on": false,
+        "lora": "JAB_Illustrious_V1.5.safetensors",
+        "strength": 0.4
+      },
+      "➕ Add Lora": "",
+      "model": [
+        "4",
+        0
+      ],
+      "clip": [
+        "4",
+        1
+      ]
+    },
+    "class_type": "Power Lora Loader (rgthree)",
+    "_meta": {
+      "title": "Power Lora Loader (rgthree)"
+    }
+  },
+  "12": {
+    "inputs": {
+      "text": "Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form"
+    },
+    "class_type": "Text Multiline",
+    "_meta": {
+      "title": "dynamicInput"
+    }
+  },
+  "13": {
+    "inputs": {
+      "text": "embedding:lazypos"
+    },
+    "class_type": "Text Multiline",
+    "_meta": {
+      "title": "staticInput"
+    }
+  },
+  "15": {
+    "inputs": {
+      "delimiter": "comma",
+      "text1": [
+        "13",
+        0
+      ],
+      "text2": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "Text Concatenate (JPS)",
+    "_meta": {
+      "title": "Text Concatenate (JPS)"
+    }
+  },
+  "18": {
+    "inputs": {
+      "text": "embedding:lazypos, Create an alluring illustration of a naked woman with feline-inspired features, including large, human-like paws. She should have pointed ears and a long, flowing tail, all accentuating her seductive and playful nature. The scene should be bathed in soft, warm lighting, highlighting her curves and the sensuality of her pose. The background should be minimalistic, allowing the focus to remain on her captivating form",
+      "anything": [
+        "15",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  }
+}

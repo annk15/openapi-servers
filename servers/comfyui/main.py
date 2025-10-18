@@ -39,21 +39,21 @@ async def startup_event():
 # Routes
 # -------------------------------
 
-@app.get("/workflows", summary="List available workflow configurations")
-def list_workflows():
+@app.get("/get_styles", summary="List available styles")
+def get_styles():
     """
-    Return the configured workflows along with which one is currently active.
+    Return the configured workflow styles.
     """
-    return {"workflows": get_workflow_configs()}
+    return {"styles": get_workflow_configs()}
 
 
-@app.post("/workflows/{workflow_name}/activate", summary="Set the active workflow")
-def activate_workflow(workflow_name: str):
+@app.post("/activate_style/{style_name}", summary="Activate one of the available styles")
+def activate_style(style_name: str):
     """
-    Update the active workflow used for subsequent generations.
+    Activate the style to use when generating images.
     """
     try:
-        set_active_workflow(workflow_name)
+        set_active_workflow(style_name)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

@@ -68,7 +68,7 @@ def generate_image(
 
     negative_default = "embedding:lazyneg"
     seed_default = random.randint(0, 2**32 - 1)
-    workflow_default = get_workflows()[0]
+    workflow_default = get_active_workflow()
 
     print("- Generate image with:")
     print(f"Positive prompt: {positive}")

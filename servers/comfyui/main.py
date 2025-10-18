@@ -39,29 +39,12 @@ async def startup_event():
 # Routes
 # -------------------------------
 
-@app.get("/get_styles", summary="List available styles")
-def get_styles():
+@app.get("/get_workflows", summary="Return a list of available workflows")
+def get_workflows():
     """
-    Return the configured workflow styles.
+    Return a list of available workflows.
     """
-    return {"styles": get_workflow_configs()}
-
-
-@app.post("/activate_style/{style_name}", summary="Activate one of the available styles")
-def activate_style(style_name: str):
-    """
-    Activate the style to use when generating images.
-    """
-    try:
-        set_active_workflow(style_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-
-    return {
-        "active": get_active_workflow(),
-        "workflows": get_workflow_configs(),
-    }
-
+    return {"workflows": get_workflow_configs()}
 
 @app.get("/generate_image", summary="Generate a image based on input parameters")
 def generate_image(
@@ -74,6 +57,9 @@ def generate_image(
     seed: Optional[int] = Query(
         None, ge=0, description="Optional seed to reproduce results."
     ),
+    workflow: Optional[str] = Query(
+        None, ge=0, description="Optional set the workflow to one of the available workflows"
+    ),
 ):
     """
     Trigger ComfyUI to generate an image and return a Markdown image reference
@@ -82,14 +68,22 @@ def generate_image(
 
     negative_default = "embedding:lazyneg"
     seed_default = random.randint(0, 2**32 - 1)
+    workflow_default = get_workflows()[0]
 
     print("- Generate image with:")
     print(f"Positive prompt: {positive}")
     print(f"No negative prompt provided, will use default: {negative_default}")
     print(f"No seed provided, will use default: {seed_default}")
+    print(f"No workflow provided, will use default: {workflow_default}")
 
     seed = seed if seed is not None else seed_default
     negative = negative if negative is not None else negative_default
+    workflow = workflow if workflow is not None else workflow_default
+
+    try:
+        set_active_workflow(workflow)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
     try:
         images_by_node = generate_images(

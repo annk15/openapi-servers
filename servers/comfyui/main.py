@@ -58,7 +58,7 @@ def generate_image(
         None, ge=0, description="Optional seed to reproduce results."
     ),
     workflow: Optional[str] = Query(
-        None, ge=0, description="Optional set the workflow to one of the available workflows"
+        None, description="Optional set the workflow to one of the available workflows"
     ),
 ):
     """

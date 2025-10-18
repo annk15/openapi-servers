@@ -230,14 +230,13 @@ def get_history(prompt_id: str) -> dict:
     url = f"http://{server_address}/history/{prompt_id}"
     return http_get_json(url)
 
-def get_image(filename: str, subfolder: str, folder_type: str) -> bytes:
-    """Fetch binary image data via /view."""
+def get_image(filename: str, subfolder: str, folder_type: str) -> str:
+    """Return the URL to the generated image served by ComfyUI."""
     params = urllib.parse.urlencode(
         {"filename": filename, "subfolder": subfolder, "type": folder_type}
     )
     url = f"http://{server_address}/view?{params}"
-    with urllib.request.urlopen(url, timeout=120) as resp:
-        return resp.read()
+    return url
 
 def wait_until_done(prompt_id: str, poll_interval: float = 1.0, max_wait: int = 600) -> dict:
     """
@@ -288,10 +287,10 @@ def generate_images(
     positive_text,
     negative_text: Optional[str] = None,
     seed: Optional[int] = None
-) -> Dict[str, List[bytes]]:
+) -> Dict[str, List[str]]:
     """
-    Submit the workflow, poll until done, then fetch images grouped by node_id.
-    Returns: { node_id: [image_bytes, ...], ... }
+    Submit the workflow, poll until done, then return image URLs grouped by node_id.
+    Returns: { node_id: [image_url, ...], ... }
     """
 
     workflow = update_workflow(
@@ -307,13 +306,13 @@ def generate_images(
     history_entry = wait_until_done(prompt_id)
 
     # Download all produced images
-    output_images: Dict[str, List[bytes]] = {}
+    output_images: Dict[str, List[str]] = {}
     outputs = history_entry.get("outputs", {})
     for node_id, node_output in outputs.items():
-        images_output: List[bytes] = []
+        images_output: List[str] = []
         for image in node_output.get("images", []):
-            img = get_image(image["filename"], image["subfolder"], image["type"])
-            images_output.append(img)
+            image_url = get_image(image["filename"], image["subfolder"], image["type"])
+            images_output.append(image_url)
         if images_output:
             output_images[node_id] = images_output
 
